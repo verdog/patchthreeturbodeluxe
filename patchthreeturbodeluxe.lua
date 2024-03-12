@@ -1,10 +1,96 @@
--- title:   patch three
+-- title:   patch three turbo deluxe
 -- authors: dogsplusplus (programming, music) and thetainfelix (art, game design)
 -- desc:    battle of the bits game jam five
 -- site:    battleofthebits.com
 -- license: MIT License
 -- version: 0.0
 -- script:  lua
+
+GAME = {
+	time_of_day = 0, -- 0: morning, 1: noon, 2: evening
+	state = "title",
+	combo = 0,
+	moves = 0,
+	energy = 30,
+	froots = 0,
+	seed = math.random(),
+
+	GRID = {
+		x = 20,
+		y = 19,
+		cols = 19,
+		rows = 6,
+		px_space = 8,
+		cells = {},
+		hover_i = nil,
+		held_i = nil,
+	},
+
+	PLOTS = {},
+	PARTICLES = {},
+	FREE_VEGS = {},
+
+	GROW = {
+		delay = 12,
+		survived = false,
+	},
+
+	LILGUY = {
+		state = "wait",
+		x = 216,
+		y = 116,
+		vx = 0,
+		vy = 0,
+		onground = false,
+		target = nil,
+		blink = 0,
+		wait = 0,
+	},
+}
+
+UI = {
+	notify_queue = {},
+	health = {
+		zerox = 160,
+		zeroy = 96,
+		maxx = 160,
+		maxy = -8,
+		x = GAME.GRID.x + 160,
+		y = GAME.GRID.y + 96,
+		dx = 0,
+		dy = 0,
+	},
+	combo = {
+		zerox = -15,
+		zeroy = 96,
+		maxx = -15,
+		maxy = -8,
+		x = GAME.GRID.x + -15,
+		y = GAME.GRID.y + 96,
+		dx = 0,
+		dy = 0,
+	},
+	dir = {
+		zerox = -16,
+		zeroy = -16,
+		maxx = 162,
+		maxy = -16,
+		x = GAME.GRID.x + -16,
+		y = GAME.GRID.y + -16,
+		dx = 0,
+		dy = 0,
+	},
+}
+
+DEBUG = {
+	items = {},
+}
+
+-- init --------------------------------------------------
+
+function BOOT()
+	game_title()
+end
 
 function TIC()
 	debug_reset()
@@ -13,50 +99,40 @@ function TIC()
 	debug_print()
 end
 
--- game state
-GAME_TIME = 0 -- 0: morning, 1: noon, 2: evening
-GAME_STATE = "title"
-GAME_COMBO = 0
-GAME_MOVES = 0
-GAME_ENERGY = 30
-GAME_FROOTS = 0
-GAME_RANDOM = math.random()
-
 function game()
 	game_update()
 end
 
 function game_title()
-	GAME_STATE = "title"
-	LILGUY.state = "wait"
-	FREE_VEGS = {}
-	free_vegs_spawn_inner(math.random(240), - 10, 0, 0, math.random())
+	GAME.state = "title"
+	GAME.LILGUY.state = "wait"
+	GAME.FREE_VEGS = {}
+	free_vegs_spawn_inner(math.random(240), -10, 0, 0, math.random())
 	music(0)
 end
 
 function game_lose()
-	GAME_STATE = "lose"
-	GAME_LOST = 0
+	GAME.state = "lose"
 end
 
 function game_update()
 	cls(14) -- 14 is sky color
-	if GAME_STATE == "play" then
+	if GAME.state == "play" then
 		grid_update()
 		plots_update()
 		particle_update()
 		free_vegs_update()
 		lilguy_update()
 		ui_update()
-	elseif GAME_STATE == "grow" then
+	elseif GAME.state == "grow" then
 		grid_update(false) -- disable mouse
 		grow_update()
 		plots_update()
 		particle_update()
 		ui_update()
-	elseif GAME_STATE == "lose" then
+	elseif GAME.state == "lose" then
 		ui_update()
-	elseif GAME_STATE == "title" then
+	elseif GAME.state == "title" then
 		free_vegs_update()
 		lilguy_update()
 		ui_update()
@@ -64,17 +140,17 @@ function game_update()
 end
 
 function game_start()
-	GAME_TIME = 0
+	GAME.time_of_day = 0
 	grid_init()
 	plots_init()
-	LILGUY.state = "wait"
-	FREE_VEGS = {}
-	GAME_STATE = "play"
+	GAME.LILGUY.state = "wait"
+	GAME.FREE_VEGS = {}
+	GAME.state = "play"
 	music(1)
 end
 
 function draw()
-	if GAME_STATE ~= "title" then
+	if GAME.state ~= "title" then
 		bg_draw()
 		grid_draw()
 		plots_draw()
@@ -106,8 +182,6 @@ end
 
 -- particles ---------------------------------------------
 
-PARTICLES = {}
-
 function particle_make(t, x, y, l)
 	return {
 		t = t,
@@ -121,7 +195,7 @@ function particle_make(t, x, y, l)
 end
 
 function particle_make_drop(x, y, type)
-	table.insert(PARTICLES, {
+	table.insert(GAME.PARTICLES, {
 		t = 1,
 		type = type,
 		x = x,
@@ -134,7 +208,7 @@ function particle_make_drop(x, y, type)
 end
 
 function particle_make_splash(x, y, type)
-	table.insert(PARTICLES, {
+	table.insert(GAME.PARTICLES, {
 		t = 2,
 		type = type,
 		x = x,
@@ -147,7 +221,7 @@ end
 function particle_update()
 	local msx, msy, msl = mouse()
 
-	for i, p in pairs(PARTICLES) do
+	for i, p in pairs(GAME.PARTICLES) do
 		if p.t == 0 then
 			p.x = p.x + p.vx
 			p.y = p.y + p.vy
@@ -162,14 +236,14 @@ function particle_update()
 
 		p.life = p.life - 1
 		if p.life < 0 then
-			table.remove(PARTICLES, i)
+			table.remove(GAME.PARTICLES, i)
 			i = i - 1
 		end
 
 		if p.t == 1 then
-			if p.y > grid_y + 90 then
-				table.remove(PARTICLES, i)
-				particle_make_splash(p.x, grid_y + 90, p.type)
+			if p.y > GAME.GRID.y + 90 then
+				table.remove(GAME.PARTICLES, i)
+				particle_make_splash(p.x, GAME.GRID.y + 90, p.type)
 				i = i - 1
 			end
 		end
@@ -177,7 +251,7 @@ function particle_update()
 end
 
 function particle_draw()
-	for i, p in pairs(PARTICLES) do
+	for i, p in pairs(GAME.PARTICLES) do
 		if p.t == 0 then
 			circ(p.x, p.y, lerp(1, 5, p.life / p.maxlife), 6)
 		elseif p.t == 1 then
@@ -213,8 +287,8 @@ end
 function veg_snap_grid(veg, i)
 	local gx, gy = grid_idx_to_grid_xy(i)
 	local px, py = grid_xy_to_pixel_xy(gx, gy)
-	veg.dx = px + GRID_PX_SPACE / 2
-	veg.dy = py + GRID_PX_SPACE / 2
+	veg.dx = px + GAME.GRID.px_space / 2
+	veg.dy = py + GAME.GRID.px_space / 2
 end
 
 function veg_update(i, v)
@@ -231,27 +305,27 @@ end
 function veg_draw(i, v, x, y)
 	local frame = math.floor((time() / 600 * 4) % 4)
 	if frame == 3 then frame = 1 end
-	if grid_hover_i and i ~= grid_hover_i then frame = 1 end
+	if GAME.GRID.hover_i and i ~= GAME.GRID.hover_i then frame = 1 end
 
 	if v.color == 0 then
 		-- empty space
 	elseif v.color == 1 then
 		-- sun
-		spr(256 + frame * 32, v.x - GRID_PX_SPACE + x, v.y - GRID_PX_SPACE + y, 15, 1, 0, 0, 2, 2)
+		spr(256 + frame * 32, v.x - GAME.GRID.px_space + x, v.y - GAME.GRID.px_space + y, 15, 1, 0, 0, 2, 2)
 	elseif v.color == 2 then
 		-- water
-		spr(258 + frame * 32, v.x - GRID_PX_SPACE + x, v.y - GRID_PX_SPACE + y, 15, 1, 0, 0, 2, 2)
+		spr(258 + frame * 32, v.x - GAME.GRID.px_space + x, v.y - GAME.GRID.px_space + y, 15, 1, 0, 0, 2, 2)
 	elseif v.color == 3 then
 		-- poop
-		spr(260 + frame * 32, v.x - GRID_PX_SPACE + x, v.y - GRID_PX_SPACE + y, 15, 1, 0, 0, 2, 2)
+		spr(260 + frame * 32, v.x - GAME.GRID.px_space + x, v.y - GAME.GRID.px_space + y, 15, 1, 0, 0, 2, 2)
 	elseif v.color == 4 then
 		-- seed
-		spr(262 + frame * 32, v.x - GRID_PX_SPACE + x, v.y - GRID_PX_SPACE + y, 15, 1, 0, 0, 2, 2)
+		spr(262 + frame * 32, v.x - GAME.GRID.px_space + x, v.y - GAME.GRID.px_space + y, 15, 1, 0, 0, 2, 2)
 	elseif v.color == 5 then
 		-- hourglass
 		local frame = math.floor(time() / 1500) % 4
 		if frame == 3 then frame = 0 end
-		spr(264 + 32 * frame, v.x - GRID_PX_SPACE + x, v.y - GRID_PX_SPACE + y, 13, 1, 0, 0, 2, 2)
+		spr(264 + 32 * frame, v.x - GAME.GRID.px_space + x, v.y - GAME.GRID.px_space + y, 13, 1, 0, 0, 2, 2)
 	elseif v.color == 6 or v.color == 7 or v.color == 8 then
 		-- vine
 		local variant = math.floor(v.random * 4) * 2
@@ -298,7 +372,7 @@ function veg_draw(i, v, x, y)
 			flip = math.floor(v.random * 2)
 		end
 
-		spr(96 + shape * 32 + variant, v.x - GRID_PX_SPACE, v.y - GRID_PX_SPACE,
+		spr(96 + shape * 32 + variant, v.x - GAME.GRID.px_space, v.y - GAME.GRID.px_space,
 			15, 1, flip, 0, 2, 2)
 	end
 
@@ -308,40 +382,31 @@ function veg_draw(i, v, x, y)
 		local flip = math.floor(v.random * 2)
 		local frame = math.floor(time() / 1000 + v.random * 4) % 4
 		if frame == 3 then frame = 1 end
-		spr(266 + variant + frame * 2, v.x - GRID_PX_SPACE, v.y - GRID_PX_SPACE,
+		spr(266 + variant + frame * 2, v.x - GAME.GRID.px_space, v.y - GAME.GRID.px_space,
 			15, 1, flip, 0, 2, 2)
 	elseif v.color == 8 then
 		local flip = math.floor(v.random * 2)
-		spr(392, v.x - GRID_PX_SPACE, v.y - GRID_PX_SPACE,
+		spr(392, v.x - GAME.GRID.px_space, v.y - GAME.GRID.px_space,
 			15, 1, flip, 0, 2, 2)
 	end
 end
-
-FREE_VEGS = {}
-LILGUY = {
-	state = "wait",
-	x = 216, y = 116,
-	vx = 0, vy = 0,
-	onground = false,
-	target = nil,
-	blink = 0,
-	wait = 0,
-}
 
 function free_vegs_spawn(veg)
 	free_vegs_spawn_inner(veg.dx, veg.dy, math.random() * 4 - 2, -2, veg.random)
 end
 
 function free_vegs_spawn_inner(x, y, vx, vy, random)
-	table.insert(FREE_VEGS, {
-		x = x, y = y,
-		vx = vx,  vy = vy,
+	table.insert(GAME.FREE_VEGS, {
+		x = x,
+		y = y,
+		vx = vx,
+		vy = vy,
 		random = random,
 	})
 end
 
 function free_vegs_update()
-	for i, v in pairs(FREE_VEGS) do
+	for i, v in pairs(GAME.FREE_VEGS) do
 		v.x = v.x + v.vx
 		v.y = v.y + v.vy
 
@@ -367,7 +432,7 @@ function free_vegs_update()
 end
 
 function free_vegs_draw()
-	for i, v in pairs(FREE_VEGS) do
+	for i, v in pairs(GAME.FREE_VEGS) do
 		local variant = math.floor(v.random * 8) * 32
 		local flip = math.floor(v.random * 2)
 		local frame = math.floor(time() / 250 + v.random * 4) % 4
@@ -378,63 +443,63 @@ function free_vegs_draw()
 end
 
 function lilguy_update()
-	LILGUY.blink = LILGUY.blink - 1
+	GAME.LILGUY.blink = GAME.LILGUY.blink - 1
 
 	local blink = math.random() * 4 < 0.01
 	if blink then
-		LILGUY.blink = 8
+		GAME.LILGUY.blink = 8
 	end
 
-	LILGUY.x = LILGUY.x + LILGUY.vx
-	LILGUY.y = LILGUY.y + LILGUY.vy
-	LILGUY.vy = LILGUY.vy + 0.06
+	GAME.LILGUY.x = GAME.LILGUY.x + GAME.LILGUY.vx
+	GAME.LILGUY.y = GAME.LILGUY.y + GAME.LILGUY.vy
+	GAME.LILGUY.vy = GAME.LILGUY.vy + 0.06
 
-	LILGUY.onground = LILGUY.y >= 116
-	if LILGUY.onground then
-		LILGUY.vx = LILGUY.vx * 0.93
-		LILGUY.y = 116
-		LILGUY.vy = 0
+	GAME.LILGUY.onground = GAME.LILGUY.y >= 116
+	if GAME.LILGUY.onground then
+		GAME.LILGUY.vx = GAME.LILGUY.vx * 0.93
+		GAME.LILGUY.y = 116
+		GAME.LILGUY.vy = 0
 	end
 
-	if LILGUY.state == "wait" then
-		if math.abs(LILGUY.x - 216) > 1 then
-			LILGUY.vx = LILGUY.vx + sign(216 - LILGUY.x) * 0.06
+	if GAME.LILGUY.state == "wait" then
+		if math.abs(GAME.LILGUY.x - 216) > 1 then
+			GAME.LILGUY.vx = GAME.LILGUY.vx + sign(216 - GAME.LILGUY.x) * 0.06
 		end
 
-		if #FREE_VEGS > 0 then
-			LILGUY.state = "fetch"
-			LILGUY.vy = -2
+		if #GAME.FREE_VEGS > 0 then
+			GAME.LILGUY.state = "fetch"
+			GAME.LILGUY.vy = -2
 		end
-	elseif LILGUY.state == "fetch" then
-		if LILGUY.onground then
-			LILGUY.vx = LILGUY.vx + sign(FREE_VEGS[1].x - LILGUY.x) * 0.06
+	elseif GAME.LILGUY.state == "fetch" then
+		if GAME.LILGUY.onground then
+			GAME.LILGUY.vx = GAME.LILGUY.vx + sign(GAME.FREE_VEGS[1].x - GAME.LILGUY.x) * 0.06
 		end
-		if LILGUY.vx > 1 then LILGUY.vx = 1 end
-		if LILGUY.vx < -1 then LILGUY.vx = -1 end
+		if GAME.LILGUY.vx > 1 then GAME.LILGUY.vx = 1 end
+		if GAME.LILGUY.vx < -1 then GAME.LILGUY.vx = -1 end
 
-		if math.abs(LILGUY.x - FREE_VEGS[1].x) < 1 and
-		math.abs(LILGUY.vx) < 0.25 and
-		math.abs(FREE_VEGS[1].vx) < 0.25 and
-		math.abs(FREE_VEGS[1].vy) < 0.25 then
-			LILGUY.state = "claim"
-			LILGUY.wait = 45
-			LILGUY.vx = 0
-			if GAME_STATE ~= "title" then
+		if math.abs(GAME.LILGUY.x - GAME.FREE_VEGS[1].x) < 1 and
+				math.abs(GAME.LILGUY.vx) < 0.25 and
+				math.abs(GAME.FREE_VEGS[1].vx) < 0.25 and
+				math.abs(GAME.FREE_VEGS[1].vy) < 0.25 then
+			GAME.LILGUY.state = "claim"
+			GAME.LILGUY.wait = 45
+			GAME.LILGUY.vx = 0
+			if GAME.state ~= "title" then
 				sfx(6)
 			end
 		end
-	elseif LILGUY.state == "claim" then
-		if LILGUY.wait > 0 then
-			LILGUY.wait = LILGUY.wait - 1
-			FREE_VEGS[1].x = LILGUY.x + 6
-			FREE_VEGS[1].y = LILGUY.y - 8
+	elseif GAME.LILGUY.state == "claim" then
+		if GAME.LILGUY.wait > 0 then
+			GAME.LILGUY.wait = GAME.LILGUY.wait - 1
+			GAME.FREE_VEGS[1].x = GAME.LILGUY.x + 6
+			GAME.FREE_VEGS[1].y = GAME.LILGUY.y - 8
 		else
-			table.remove(FREE_VEGS, 1)
+			table.remove(GAME.FREE_VEGS, 1)
 
-			if #FREE_VEGS == 0 then
-				LILGUY.state = "wait"
+			if #GAME.FREE_VEGS == 0 then
+				GAME.LILGUY.state = "wait"
 			else
-				LILGUY.state = "fetch"
+				GAME.LILGUY.state = "fetch"
 			end
 		end
 	end
@@ -444,19 +509,19 @@ function lilguy_draw()
 	local flip = 0
 	local PAL_MAP = 0x3FF0
 
-	if LILGUY.blink > 0 then
+	if GAME.LILGUY.blink > 0 then
 		poke4(PAL_MAP * 2 + 4, 3)
 		poke4(PAL_MAP * 2 + 6, 3)
 	end
 
-	if LILGUY.state == "claim" then
-		spr(488, math.floor(LILGUY.x - 4 + 0.5), LILGUY.y, 15, 1, 0, 0, 2, 2)
+	if GAME.LILGUY.state == "claim" then
+		spr(488, math.floor(GAME.LILGUY.x - 4 + 0.5), GAME.LILGUY.y, 15, 1, 0, 0, 2, 2)
 	else
-		flip = (LILGUY.vx > 0.1) and 1 or 0
+		flip = (GAME.LILGUY.vx > 0.1) and 1 or 0
 		local sp = 424
 
-		if LILGUY.onground then
-			if math.abs(LILGUY.vx) > 0.02 then
+		if GAME.LILGUY.onground then
+			if math.abs(GAME.LILGUY.vx) > 0.02 then
 				sp = 480 + (math.floor(time() / 50) % 4) * 2
 			else
 				-- idle
@@ -467,7 +532,7 @@ function lilguy_draw()
 			sp = 456
 		end
 
-		spr(sp, math.floor(LILGUY.x - 4 + 0.5), LILGUY.y, 15, 1, flip, 0, 2, 2)
+		spr(sp, math.floor(GAME.LILGUY.x - 4 + 0.5), GAME.LILGUY.y, 15, 1, flip, 0, 2, 2)
 	end
 
 	for j = 0, 15 do
@@ -477,51 +542,39 @@ end
 
 -- grid --------------------------------------------------
 
--- constants
-GRID_COLS = 19
-GRID_ROWS = 6
-GRID_PX_SPACE = 8
-
-grid = {}   -- grid cells. filled by grid_init
-grid_x = 20 -- pixel x offset of grid's top left corner
-grid_y = 19 -- pixel y offset of grid's top left corner
-
 function grid_init()
-	for i = 0, (GRID_COLS * GRID_ROWS) - 1 do
-		grid[i] = veg_make()
-		grid[i].color = ((i * 2) % 4) + 1
-		veg_snap_grid(grid[i], i)
-		grid[i].x = grid[i].dx
-		grid[i].y = grid[i].dy
+	for i = 0, (GAME.GRID.cols * GAME.GRID.rows) - 1 do
+		GAME.GRID.cells[i] = veg_make()
+		GAME.GRID.cells[i].color = ((i * 2) % 4) + 1
+		veg_snap_grid(GAME.GRID.cells[i], i)
+		GAME.GRID.cells[i].x = GAME.GRID.cells[i].dx
+		GAME.GRID.cells[i].y = GAME.GRID.cells[i].dy
 	end
 end
-
-grid_hover_i = nil
-grid_held_i = nil
 
 function grid_update_dragndrop(gx, gy, msl, msr)
 	if gx == nil or gy == nil then return end
 
 	-- grab/swap/drop grid item
-	if not grid_held_i and msl then
+	if not GAME.GRID.held_i and msl then
 		-- grab it
 		local i = grid_xy_to_grid_idx(gx, gy)
-		if i and grid[i].color ~= 0 and grid[i].color <= 5 then
-			grid_held_i = i
+		if i and GAME.GRID.cells[i].color ~= 0 and GAME.GRID.cells[i].color <= 5 then
+			GAME.GRID.held_i = i
 		end
-	elseif grid_held_i and msl then
+	elseif GAME.GRID.held_i and msl then
 		-- swap it
 		local i = grid_xy_to_grid_idx(gx, gy)
-		if i and grid[i].color ~= 0 and grid[i].color <= 5 then
-			local held_ns = grid_calc_neighbors(grid_held_i)
+		if i and GAME.GRID.cells[i].color ~= 0 and GAME.GRID.cells[i].color <= 5 then
+			local held_ns = grid_calc_neighbors(GAME.GRID.held_i)
 			if table.contains(held_ns, i) then
-				grid_swap(grid_held_i, i)
-				grid_held_i = nil
-				GAME_MOVES = GAME_MOVES + 1
-				GAME_ENERGY = GAME_ENERGY - 5
+				grid_swap(GAME.GRID.held_i, i)
+				GAME.GRID.held_i = nil
+				GAME.moves = GAME.moves + 1
+				GAME.energy = GAME.energy - 5
 				sfx(2)
 
-				if GAME_ENERGY < 1 then
+				if GAME.energy < 1 then
 					ui_notify("OUT OF MOVES!!! GAME OVER!!!")
 					game_lose()
 				end
@@ -529,14 +582,14 @@ function grid_update_dragndrop(gx, gy, msl, msr)
 		end
 	else
 		-- drop it
-		grid_held_i = nil
+		GAME.GRID.held_i = nil
 	end
 end
 
 function grid_update_tally_local_matches()
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		-- clean up dangling ups left after big fruit match
-		if v.up and grid[v.up].color < 6 then
+		if v.up and GAME.GRID.cells[v.up].color < 6 then
 			v.up = nil
 		end
 
@@ -545,8 +598,8 @@ function grid_update_tally_local_matches()
 			v.dn_matches = 0
 			local ns = grid_calc_neighbors(i)
 			for j, ui in pairs(ns) do
-				if grid[ui].color == v.color and
-						grid[ui].dormant == 0 and
+				if GAME.GRID.cells[ui].color == v.color and
+						GAME.GRID.cells[ui].dormant == 0 and
 						v.color ~= 0
 				then
 					if j % 2 == 0 then
@@ -561,20 +614,20 @@ function grid_update_tally_local_matches()
 end
 
 function grid_update_spread_local_matches()
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		local ns = grid_calc_neighbors(i)
 		if v.up_matches >= 2 then
 			for j, ui in pairs(ns) do
-				if v.color == grid[ui].color and j % 2 == 0 then
-					grid[ui].up_matches = 2
+				if v.color == GAME.GRID.cells[ui].color and j % 2 == 0 then
+					GAME.GRID.cells[ui].up_matches = 2
 				end
 			end
 		end
 
 		if v.dn_matches >= 2 then
 			for j, ui in pairs(ns) do
-				if v.color == grid[ui].color and j % 2 == 1 then
-					grid[ui].dn_matches = 2
+				if v.color == GAME.GRID.cells[ui].color and j % 2 == 1 then
+					GAME.GRID.cells[ui].dn_matches = 2
 				end
 			end
 		end
@@ -584,7 +637,7 @@ end
 function grid_update_pop_match(i, v)
 	-- if fruit, BIG MATCH
 	if v.color == 7 then
-		GAME_FROOTS = GAME_FROOTS + 1
+		GAME.froots = GAME_FROOTS + 1
 		ui_notify("FRUITS GET!!!")
 		free_vegs_spawn(v)
 	end
@@ -592,7 +645,7 @@ function grid_update_pop_match(i, v)
 	if v.color == 6 or v.color == 7 then
 		if v.up then
 			-- pop all the way up
-			grid_update_pop_match(v.up, grid[v.up])
+			grid_update_pop_match(v.up, GAME.GRID.cells[v.up])
 			-- todo other fruit stuff
 		end
 	end
@@ -601,48 +654,48 @@ function grid_update_pop_match(i, v)
 	local new_v = veg_make()
 	new_v.color = 0
 	veg_snap_grid(new_v, i)
-	new_v.x = grid[i].dx
-	new_v.y = grid[i].dy
-	grid[i] = new_v
+	new_v.x = GAME.GRID.cells[i].dx
+	new_v.y = GAME.GRID.cells[i].dy
+	GAME.GRID.cells[i] = new_v
 
 	-- particles
 	local gx, gy = grid_idx_to_grid_xy(i)
 	local px, py = grid_xy_to_pixel_xy(gx, gy)
 	for i = 0, 4 do
-		table.insert(PARTICLES, particle_make(0, px + 8, py + 8, 24))
+		table.insert(GAME.PARTICLES, particle_make(0, px + 8, py + 8, 24))
 	end
 
 	-- audio
 	if v.color == 7 then
 		sfx(0)
 	else
-		sfx(1, math.floor(8 + lerp(0, 77, GAME_COMBO / 300)))
+		sfx(1, math.floor(8 + lerp(0, 77, GAME.combo / 300)))
 	end
 
 	-- combo/moves
-	GAME_COMBO = GAME_COMBO + 1
-	GAME_ENERGY = GAME_ENERGY + 1
+	GAME.combo = GAME.combo + 1
+	GAME.energy = GAME.energy + 1
 end
 
 function grid_update_pop_matches(advance_time_t)
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		if v.dormant > 0 then
 			v.dormant = v.dormant - 1
 		elseif v.up_matches >= 2 or v.dn_matches >= 2 then
-			if v.color ~= 7 or GAME_STATE == "play" then
+			if v.color ~= 7 or GAME.state == "play" then
 				grid_update_pop_match(i, v)
 			end
 			-- fall to plot
 			local gx, gy = grid_idx_to_grid_xy(i)
 			if gx % 2 == 1 then
 				if v.color == 1 then
-					plots[gx].sun = plots[gx].sun + 1
+					GAME.PLOTS[gx].sun = GAME.PLOTS[gx].sun + 1
 				elseif v.color == 2 then
-					plots[gx].water = plots[gx].water + 1
+					GAME.PLOTS[gx].water = GAME.PLOTS[gx].water + 1
 				elseif v.color == 3 then
-					plots[gx].poop = plots[gx].poop + 1
+					GAME.PLOTS[gx].poop = GAME.PLOTS[gx].poop + 1
 				elseif v.color == 4 then
-					plots[gx].seed = plots[gx].seed + 1
+					GAME.PLOTS[gx].seed = GAME.PLOTS[gx].seed + 1
 				end
 
 				if v.color < 5 then
@@ -658,7 +711,7 @@ function grid_update_pop_matches(advance_time_t)
 end
 
 function grid_update_trickle(any_dormant_t)
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		v.age = v.age + 1
 		v.swapped = false
 		if v.color > 0 and v.color < 6 and v.dormant > 0 then
@@ -666,14 +719,14 @@ function grid_update_trickle(any_dormant_t)
 		end
 	end
 
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		if v.color == 0 and v.swapped == false and
 				v.age % 5 == 0 then
 			local ns_cand = grid_calc_up_neighbors(i)
 			local ns = {}
 
 			for i, n in pairs(ns_cand) do
-				if grid[n].color > 0 and grid[n].color < 6 then
+				if GAME.GRID.cells[n].color > 0 and GAME.GRID.cells[n].color < 6 then
 					table.insert(ns, n)
 				end
 			end
@@ -681,31 +734,31 @@ function grid_update_trickle(any_dormant_t)
 			if #ns > 0 then
 				local pick = 1
 
-				if GAME_TIME == 0 then
+				if GAME.time_of_day == 0 then
 					-- morning: right: last
 					pick = #ns
-				elseif GAME_TIME == 1 then
+				elseif GAME.time_of_day == 1 then
 					-- noon: random
 					pick = math.random(#ns)
-				elseif GAME_TIME == 2 then
+				elseif GAME.time_of_day == 2 then
 					-- evening: left
 					pick = 1
 				end
 
-				if grid[ns[pick]].color ~= 0 and
-						not grid[ns[pick]].swapped then
-					grid[i].swapped = true
-					grid[ns[pick]].swapped = true
-					grid[i].dormant = 35
-					grid[ns[pick]].dormant = 35
+				if GAME.GRID.cells[ns[pick]].color ~= 0 and
+						not GAME.GRID.cells[ns[pick]].swapped then
+					GAME.GRID.cells[i].swapped = true
+					GAME.GRID.cells[ns[pick]].swapped = true
+					GAME.GRID.cells[i].dormant = 35
+					GAME.GRID.cells[ns[pick]].dormant = 35
 					grid_swap(i, ns[pick])
 				end
-			elseif math.floor(i / GRID_COLS) == 0 then
+			elseif math.floor(i / GAME.GRID.cols) == 0 then
 				-- no up neighbors, top row
-				grid[i] = veg_make()
-				veg_snap_grid(grid[i], i)
-				grid[i].x = grid[i].dx
-				grid[i].y = grid[i].dy
+				GAME.GRID.cells[i] = veg_make()
+				veg_snap_grid(GAME.GRID.cells[i], i)
+				GAME.GRID.cells[i].x = GAME.GRID.cells[i].dx
+				GAME.GRID.cells[i].y = GAME.GRID.cells[i].dy
 			end
 		end
 	end
@@ -720,7 +773,7 @@ function grid_update(enable_mouse)
 
 	-- grid hover
 	if gx then
-		grid_hover_i = grid_xy_to_grid_idx(gx, gy)
+		GAME.GRID.hover_i = grid_xy_to_grid_idx(gx, gy)
 
 		-- froot cheets
 		if msr then
@@ -730,7 +783,7 @@ function grid_update(enable_mouse)
 
 	grid_update_dragndrop(gx, gy, msl, msr)
 	-- this just moves the veg x/y for drawing
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		veg_update(i, v)
 	end
 
@@ -751,23 +804,23 @@ function grid_update(enable_mouse)
 	end
 
 	if any_dormant[1] == false then
-		if GAME_COMBO > 25 then
+		if GAME.combo > 25 then
 			sfx(5)
 		end
-		GAME_COMBO = 0
+		GAME.combo = 0
 	end
 end
 
 function grid_swap(idx1, idx2)
-	local tmp = grid[idx1]
-	grid[idx1] = grid[idx2]
-	grid[idx2] = tmp
-	veg_snap_grid(grid[idx1], idx1)
-	veg_snap_grid(grid[idx2], idx2)
+	local tmp = GAME.GRID.cells[idx1]
+	GAME.GRID.cells[idx1] = GAME.GRID.cells[idx2]
+	GAME.GRID.cells[idx2] = tmp
+	veg_snap_grid(GAME.GRID.cells[idx1], idx1)
+	veg_snap_grid(GAME.GRID.cells[idx2], idx2)
 end
 
 function grid_draw()
-	for i, v in pairs(grid) do
+	for i, v in pairs(GAME.GRID.cells) do
 		if v.color >= 1 and v.color <= 5 and v.dormant > 0 then
 			-- map all colors to black to draw outlines
 			local PAL_MAP = 0x3FF0
@@ -796,23 +849,23 @@ function grid_draw()
 		end
 	end
 
-	if grid_held_i then
-		local gx, gy = grid_idx_to_grid_xy(grid_held_i)
+	if GAME.GRID.held_i then
+		local gx, gy = grid_idx_to_grid_xy(GAME.GRID.held_i)
 		local px, py = grid_xy_to_pixel_xy(gx, gy)
 		rectb(px - 2, py - 2,
-			GRID_PX_SPACE + 5, GRID_PX_SPACE + 5, 0)
+			GAME.GRID.px_space + 5, GAME.GRID.px_space + 5, 0)
 	end
 
-	if grid_hover_i then
-		local gx, gy = grid_idx_to_grid_xy(grid_hover_i)
+	if GAME.GRID.hover_i then
+		local gx, gy = grid_idx_to_grid_xy(GAME.GRID.hover_i)
 		local px, py = grid_xy_to_pixel_xy(gx, gy)
 		rectb(px - 2, py - 2,
-			GRID_PX_SPACE + 5, GRID_PX_SPACE + 5, 0)
+			GAME.GRID.px_space + 5, GAME.GRID.px_space + 5, 0)
 	end
 end
 
 function add_valid_grid_idx(t, i)
-	local GRID_SIZE = GRID_ROWS * GRID_COLS
+	local GRID_SIZE = GAME.GRID.rows * GAME.GRID.cols
 	if i >= 0 and i < GRID_SIZE then
 		table.insert(t, i)
 	end
@@ -820,12 +873,12 @@ end
 
 function grid_calc_up_neighbors(i)
 	local result = {}
-	local col = i % GRID_COLS
-	local lastc = GRID_COLS - 1
+	local col = i % GAME.GRID.cols
+	local lastc = GAME.GRID.cols - 1
 
-	if (i % GRID_COLS) % 2 == 0 then
-		if col ~= 0 then add_valid_grid_idx(result, i - GRID_COLS - 1) end
-		if col ~= lastc then add_valid_grid_idx(result, i - GRID_COLS + 1) end
+	if (i % GAME.GRID.cols) % 2 == 0 then
+		if col ~= 0 then add_valid_grid_idx(result, i - GAME.GRID.cols - 1) end
+		if col ~= lastc then add_valid_grid_idx(result, i - GAME.GRID.cols + 1) end
 	else
 		if col ~= 0 then add_valid_grid_idx(result, i - 1) end
 		if col ~= lastc then add_valid_grid_idx(result, i + 1) end
@@ -836,12 +889,12 @@ end
 
 function grid_calc_dn_neighbors(i)
 	local result = {}
-	local col = i % GRID_COLS
-	local lastc = GRID_COLS - 1
+	local col = i % GAME.GRID.cols
+	local lastc = GAME.GRID.cols - 1
 
-	if (i % GRID_COLS) % 2 == 1 then
-		if col ~= lastc then add_valid_grid_idx(result, i + GRID_COLS + 1) end
-		if col ~= 0 then add_valid_grid_idx(result, i + GRID_COLS - 1) end
+	if (i % GAME.GRID.cols) % 2 == 1 then
+		if col ~= lastc then add_valid_grid_idx(result, i + GAME.GRID.cols + 1) end
+		if col ~= 0 then add_valid_grid_idx(result, i + GAME.GRID.cols - 1) end
 	else
 		if col ~= lastc then add_valid_grid_idx(result, i + 1) end
 		if col ~= 0 then add_valid_grid_idx(result, i - 1) end
@@ -858,33 +911,33 @@ function grid_calc_neighbors(i)
 end
 
 function grid_idx_to_grid_xy(idx)
-	local x = math.floor(idx % GRID_COLS)
-	local y = math.floor(idx / GRID_COLS)
+	local x = math.floor(idx % GAME.GRID.cols)
+	local y = math.floor(idx / GAME.GRID.cols)
 	return x, y
 end
 
 function grid_xy_to_grid_idx(x, y)
-	return math.floor(y * GRID_COLS + x)
+	return math.floor(y * GAME.GRID.cols + x)
 end
 
 function grid_pixel_size()
-	return GRID_PX_SPACE * GRID_COLS,
-			GRID_PX_SPACE * GRID_ROWS * 2
+	return GAME.GRID.px_space * GAME.GRID.cols,
+			GAME.GRID.px_space * GAME.GRID.rows * 2
 end
 
 function grid_xy_to_pixel_xy(x, y)
 	if x % 2 == 0 then
-		return grid_x + x * GRID_PX_SPACE,
-				grid_y + y * 2 * GRID_PX_SPACE
+		return GAME.GRID.x + x * GAME.GRID.px_space,
+				GAME.GRID.y + y * 2 * GAME.GRID.px_space
 	else
-		return grid_x + x * GRID_PX_SPACE,
-				grid_y + GRID_PX_SPACE + y * 2 * GRID_PX_SPACE
+		return GAME.GRID.x + x * GAME.GRID.px_space,
+				GAME.GRID.y + GAME.GRID.px_space + y * 2 * GAME.GRID.px_space
 	end
 end
 
 function pixel_xy_to_grid_xy(x, y)
-	local gpx = x - grid_x
-	local gpy = y - grid_y
+	local gpx = x - GAME.GRID.x
+	local gpy = y - GAME.GRID.y
 	local gw, gh = grid_pixel_size()
 
 	-- if x,y is outside of the grid's bounding box, return nil
@@ -893,8 +946,8 @@ function pixel_xy_to_grid_xy(x, y)
 	end
 
 	-- calculate which cell of the subgrid x,y is in
-	local spx = math.floor(gpx / GRID_PX_SPACE)
-	local spy = math.floor(gpy / GRID_PX_SPACE)
+	local spx = math.floor(gpx / GAME.GRID.px_space)
+	local spy = math.floor(gpy / GAME.GRID.px_space)
 
 	-- mouse is directly over an occupied space
 	if spx % 2 == 0 then
@@ -910,27 +963,25 @@ function pixel_xy_to_grid_xy(x, y)
 	-- mouse is over a void space. take the pointer's
 	-- angle relative to the center of the void and
 	-- find the closest occupied space.
-	local grid_middle_x = grid_x + spx * GRID_PX_SPACE + GRID_PX_SPACE / 2
-	local grid_middle_y = grid_y + spy * GRID_PX_SPACE + GRID_PX_SPACE / 2
+	local grid_middle_x = GAME.GRID.x + spx * GAME.GRID.px_space + GAME.GRID.px_space / 2
+	local grid_middle_y = GAME.GRID.y + spy * GAME.GRID.px_space + GAME.GRID.px_space / 2
 
 	local to_p_x = x - grid_middle_x
 	local to_p_y = y - grid_middle_y
 	local angle = math.atan(to_p_y, to_p_x) % (2 * math.pi)
 
 	if angle < math.pi / 4 or angle > math.pi / 4 * 7 then
-		return pixel_xy_to_grid_xy(x + GRID_PX_SPACE, y)
+		return pixel_xy_to_grid_xy(x + GAME.GRID.px_space, y)
 	elseif angle < math.pi / 4 * 3 then
-		return pixel_xy_to_grid_xy(x, y + GRID_PX_SPACE)
+		return pixel_xy_to_grid_xy(x, y + GAME.GRID.px_space)
 	elseif angle < math.pi / 4 * 5 then
-		return pixel_xy_to_grid_xy(x - GRID_PX_SPACE, y)
+		return pixel_xy_to_grid_xy(x - GAME.GRID.px_space, y)
 	else
-		return pixel_xy_to_grid_xy(x, y - GRID_PX_SPACE)
+		return pixel_xy_to_grid_xy(x, y - GAME.GRID.px_space)
 	end
 end
 
 -- plots -------------------------------------------------
-
-plots = {}
 
 function plot_make()
 	return {
@@ -942,8 +993,8 @@ function plot_make()
 end
 
 function plots_init()
-	for i = 1, GRID_COLS - 1, 2 do
-		plots[i] = plot_make()
+	for i = 1, GAME.GRID.cols - 1, 2 do
+		GAME.PLOTS[i] = plot_make()
 	end
 end
 
@@ -952,9 +1003,9 @@ function plots_update()
 end
 
 function plots_draw()
-	for i, p in pairs(plots) do
-		local x = grid_x + i * GRID_PX_SPACE
-		local y = grid_y + 102
+	for i, p in pairs(GAME.PLOTS) do
+		local x = GAME.GRID.x + i * GAME.GRID.px_space
+		local y = GAME.GRID.y + 102
 		for j = 0, p.sun do
 			local color = j == p.sun and 3 or 12
 			line(x, y + j, x + 1, y + j, color)
@@ -974,37 +1025,34 @@ function plots_draw()
 	end
 end
 
-grow_delay = 12
-grow_survived = false
-
 function grow_enter()
 	sfx(4)
-	GAME_STATE = "grow"
-	grow_delay = 60
-	grow_survived = false
+	GAME.state = "grow"
+	GAME.GROW.delay = 60
+	GAME.GROW.survived = false
 	ui_notify("GROW TIME!!!")
 end
 
 function grow_update()
 	-- wait for combo to be over
-	if GAME_COMBO ~= 0 then return end
+	if GAME.combo ~= 0 then return end
 
-	if grow_delay > 0 then
+	if GAME.GROW.delay > 0 then
 		-- wait
-		grow_delay = grow_delay - 1
+		GAME.GROW.delay = GAME.GROW.delay - 1
 		return
 	else
 		-- grow a little
 		local grew_any = false
 
 		local order = {}
-		for i, _ in pairs(plots) do
+		for i, _ in pairs(GAME.PLOTS) do
 			table.insert(order, i)
 		end
 		table.shuffle(order)
 
 		for _, i in pairs(order) do
-			local p = plots[i]
+			local p = GAME.PLOTS[i]
 
 			local power = 0
 			if p.sun > 0 then power = power + 1 end
@@ -1020,57 +1068,57 @@ function grow_update()
 
 				grew_any = true
 
-				local grid_idx = GRID_COLS * (GRID_ROWS - 1) + i
+				local grid_idx = GAME.GRID.cols * (GAME.GRID.rows - 1) + i
 				grow_plot(grid_idx, power)
 				break
 			end
 		end
 
 		if grew_any == true then
-			grow_delay = 12
-			grow_survived = true
+			GAME.GROW.delay = 12
+			GAME.GROW.survived = true
 		else
-			if grow_survived then
-				GAME_STATE = "play"
-				GAME_TIME = (GAME_TIME + 1) % 3
+			if GAME.GROW.survived then
+				GAME.state = "play"
+				GAME.time_of_day = (GAME.time_of_day + 1) % 3
 			else
 				ui_notify("UNDERGROWTH!!! ENERGY PENALTY!!!")
-				GAME_STATE = "play"
-				GAME_TIME = (GAME_TIME + 1) % 3
-				GAME_ENERGY = GAME_ENERGY - 25
+				GAME.state = "play"
+				GAME.time_of_day = (GAME.time_of_day + 1) % 3
+				GAME.energy = GAME.energy - 25
 			end
 		end
 	end
 end
 
 function grow_plot(grid_idx, power)
-	if grid[grid_idx].color < 6 then
+	if GAME.GRID.cells[grid_idx].color < 6 then
 		-- not a vine, put first sprout
 		grow_plot_set_stem(nil, grid_idx, 0)
 	else
 		if power == 1 or power >= 4 then
 			-- 1 means a plain vine grow, 4 means fruit sprout on top
 			local p = grid_idx
-			while grid[p].color >= 6 do
-				if grid[p].up then
-					p = grid[p].up
+			while GAME.GRID.cells[p].color >= 6 do
+				if GAME.GRID.cells[p].up then
+					p = GAME.GRID.cells[p].up
 				else
 					local ns = grid_calc_up_neighbors(p)
 					local valid = {}
 
 					for i, n in pairs(ns) do
-						if grid[n].color < 6 then
+						if GAME.GRID.cells[n].color < 6 then
 							table.insert(valid, n)
 						end
 					end
 
 					if #valid > 0 then
 						local pick
-						if GAME_TIME == 0 then
+						if GAME.time_of_day == 0 then
 							pick = 1
-						elseif GAME_TIME == 1 then
+						elseif GAME.time_of_day == 1 then
 							pick = math.random(#valid)
-						elseif GAME_TIME == 2 then
+						elseif GAME.time_of_day == 2 then
 							pick = #valid
 						end
 						grow_plot_set_stem(p, valid[pick], power)
@@ -1089,23 +1137,23 @@ function grow_plot(grid_idx, power)
 			local ticks = math.random(16)
 			local first = grid_idx
 			local p = grid_idx
-			for i=0,ticks do
-				if grid[p].up then
-					p = grid[p].up
+			for i = 0, ticks do
+				if GAME.GRID.cells[p].up then
+					p = GAME.GRID.cells[p].up
 				else
 					p = first
 				end
 			end
 
-			if p == first and not grid[first].up then
+			if p == first and not GAME.GRID.cells[first].up then
 				-- can't do anything, just grow vine
 				grow_plot(grid_idx, 1)
 			else
-				if p == first then p = grid[first].up end
+				if p == first then p = GAME.GRID.cells[first].up end
 				-- put a pod there
-				if grid[p].color ~= 7 and grid[p].color ~= 8 then
-					grid[p].color = 8
-					grid[p].age = 0
+				if GAME.GRID.cells[p].color ~= 7 and GAME.GRID.cells[p].color ~= 8 then
+					GAME.GRID.cells[p].color = 8
+					GAME.GRID.cells[p].age = 0
 					sfx(3)
 				else
 					grow_plot(grid_idx, 1)
@@ -1113,17 +1161,17 @@ function grow_plot(grid_idx, power)
 			end
 		elseif power == 3 then
 			-- convert highest pod into fruit
-			
+
 			local p = grid_idx
 			local hipod = nil
-			while grid[p].up do
-				if grid[p].color == 8 then hipod = p end
-				p = grid[p].up
+			while GAME.GRID.cells[p].up do
+				if GAME.GRID.cells[p].color == 8 then hipod = p end
+				p = GAME.GRID.cells[p].up
 			end
 
 			if hipod then
-				grid[hipod].color = 7
-				grid[p].age = 0
+				GAME.GRID.cells[hipod].color = 7
+				GAME.GRID.cells[p].age = 0
 				sfx(3)
 			else
 				-- no pod, just try to put a pod somewhere
@@ -1151,22 +1199,22 @@ function grow_plot_set_stem(prev_idx, idx, power)
 	v.dormant = 3
 
 	if prev_idx then
-		grid[prev_idx].up = idx
+		GAME.GRID.cells[prev_idx].up = idx
 		v.dn = prev_idx
 	end
 
-	grid[idx] = v
+	GAME.GRID.cells[idx] = v
 end
 
 function grow_plot_kill_stem(i)
-	local p = grid[i]
+	local p = GAME.GRID.cells[i]
 	while p do
 		local nexti = p.up
 		p.color = 0
 		p.up = nil
 		p.dormant = 0
 		if nexti then
-			p = grid[nexti]
+			p = GAME.GRID.cells[nexti]
 		else
 			p = nil
 		end
@@ -1175,71 +1223,39 @@ end
 
 -- ui ----------------------------------------------------
 
-notify_queue = {}
-ui_health = {
-	zerox = 160,
-	zeroy = 96,
-	maxx = 160,
-	maxy = -8,
-	x = grid_x + 160,
-	y = grid_y + 96,
-	dx = 0,
-	dy = 0,
-}
-ui_combo = {
-	zerox = -15,
-	zeroy = 96,
-	maxx = -15,
-	maxy = -8,
-	x = grid_x + -15,
-	y = grid_y + 96,
-	dx = 0,
-	dy = 0,
-}
-ui_dir = {
-	zerox = -16,
-	zeroy = -16,
-	maxx = 162,
-	maxy = -16,
-	x = grid_x + -16,
-	y = grid_y + -16,
-	dx = 0,
-	dy = 0,
-}
-
 function ui_update()
-	if GAME_STATE ~= "title" then
-		for i, notif in pairs(notify_queue) do
+	if GAME.state ~= "title" then
+		for i, notif in pairs(UI.notify_queue) do
 			notif.x = notif.x - 1
 			if notif.x < -240 then
-				table.remove(notify_queue, i)
+				table.remove(UI.notify_queue, i)
 				i = i - 1
 			end
 		end
 
-		ui_health.dx = grid_x + lerp(ui_health.zerox, ui_health.maxx, (GAME_ENERGY / 300))
-		ui_health.dy = grid_y + lerp(ui_health.zeroy, ui_health.maxy, (GAME_ENERGY / 300))
+		UI.health.dx = GAME.GRID.x + lerp(UI.health.zerox, UI.health.maxx, (GAME.energy / 300))
+		UI.health.dy = GAME.GRID.y + lerp(UI.health.zeroy, UI.health.maxy, (GAME.energy / 300))
 
-		ui_combo.dx = grid_x + lerp(ui_combo.zerox, ui_combo.maxx, (GAME_COMBO / 150))
-		ui_combo.dy = grid_y + lerp(ui_combo.zeroy, ui_combo.maxy, (GAME_COMBO / 150))
+		UI.combo.dx = GAME.GRID.x + lerp(UI.combo.zerox, UI.combo.maxx, (GAME.combo / 150))
+		UI.combo.dy = GAME.GRID.y + lerp(UI.combo.zeroy, UI.combo.maxy, (GAME.combo / 150))
 
-		if GAME_TIME == 0 then
-			ui_dir.dx = grid_x - 16
-			ui_dir.dy = grid_y - 16
-		elseif GAME_TIME == 1 then
-			ui_dir.dx = grid_x + 73
-			ui_dir.dy = grid_y - 16
+		if GAME.time_of_day == 0 then
+			UI.dir.dx = GAME.GRID.x - 16
+			UI.dir.dy = GAME.GRID.y - 16
+		elseif GAME.time_of_day == 1 then
+			UI.dir.dx = GAME.GRID.x + 73
+			UI.dir.dy = GAME.GRID.y - 16
 		else
-			ui_dir.dx = grid_x + 162
-			ui_dir.dy = grid_y - 16
+			UI.dir.dx = GAME.GRID.x + 162
+			UI.dir.dy = GAME.GRID.y - 16
 		end
 
-		ui_health.x = ui_health.x + (ui_health.dx - ui_health.x) / 7
-		ui_health.y = ui_health.y + (ui_health.dy - ui_health.y) / 7
-		ui_combo.x = ui_combo.x + (ui_combo.dx - ui_combo.x) / 7
-		ui_combo.y = ui_combo.y + (ui_combo.dy - ui_combo.y) / 7
-		ui_dir.y = ui_dir.y + (ui_dir.dy - ui_dir.y) / 7
-		ui_dir.x = ui_dir.x + (ui_dir.dx - ui_dir.x) / 7
+		UI.health.x = UI.health.x + (UI.health.dx - UI.health.x) / 7
+		UI.health.y = UI.health.y + (UI.health.dy - UI.health.y) / 7
+		UI.combo.x = UI.combo.x + (UI.combo.dx - UI.combo.x) / 7
+		UI.combo.y = UI.combo.y + (UI.combo.dy - UI.combo.y) / 7
+		UI.dir.y = UI.dir.y + (UI.dir.dy - UI.dir.y) / 7
+		UI.dir.x = UI.dir.x + (UI.dir.dx - UI.dir.x) / 7
 	else
 		local _, _, msl, _, _ = mouse()
 		if msl == true then
@@ -1247,37 +1263,37 @@ function ui_update()
 		end
 
 		if math.random() < 0.003 then
-			free_vegs_spawn_inner(math.random(240), - 10, 0, 0, math.random())
+			free_vegs_spawn_inner(math.random(240), -10, 0, 0, math.random())
 		end
 	end
 end
 
 function ui_draw()
-	if GAME_STATE ~= "title" then
+	if GAME.state ~= "title" then
 		spr(51, 186, 1, 15)
-		if GAME_TIME == 0 then
+		if GAME.time_of_day == 0 then
 			print("TIME:\n morning", 195, 2, 3)
-		elseif GAME_TIME == 1 then
+		elseif GAME.time_of_day == 1 then
 			print("TIME:\n noon", 195, 2, 3)
-		elseif GAME_TIME == 2 then
+		elseif GAME.time_of_day == 2 then
 			print("TIME:\n evening", 195, 2, 3)
 		end
 
 		spr(66, 186, 12, 15)
-		print(string.format("COMBO:\n %d", GAME_COMBO), 195, 14, 3)
-		print(string.format("MOVES:\n %d", GAME_MOVES), 195, 26, 3)
+		print(string.format("COMBO:\n %d", GAME.combo), 195, 14, 3)
+		print(string.format("MOVES:\n %d", GAME.moves), 195, 26, 3)
 		spr(50, 186, 36, 15)
 		local ecolor = 3
-		if GAME_ENERGY < 30 and GAME_MOVES > 2 then
+		if GAME.energy < 30 and GAME.moves > 2 then
 			ecolor = 3 + 12 * math.floor((time() / 250) % 2)
 		end
-		print(string.format("ENERGY:\n %d", GAME_ENERGY), 195, 38, ecolor)
-		print(string.format("FRUITS:\n %d", GAME_FROOTS), 195, 50, 3)
+		print(string.format("ENERGY:\n %d", GAME.energy), 195, 38, ecolor)
+		print(string.format("FRUITS:\n %d", GAME.froots), 195, 50, 3)
 
 		-- debug stuff
-		-- print(string.format("STATE: %s", GAME_STATE), 180, 38, 14)
+		-- print(string.format("STATE: %s", GAME.state), 180, 38, 14)
 
-		for i, notif in pairs(notify_queue) do
+		for i, notif in pairs(UI.notify_queue) do
 			local c = 6 + 8 * (math.floor(notif.x / 8) % 2)
 			-- make it BOOOLLLDD!!!
 			print(notif.words, notif.x, notif.y - 1, 3)
@@ -1287,7 +1303,7 @@ function ui_draw()
 			print(notif.words, notif.x, notif.y, c)
 		end
 
-		if GAME_STATE == "lose" then
+		if GAME.state == "lose" then
 			local tips = {
 				"TIP: low fruit matches clear the whole vine!",
 				"TIP: plants grow towards the clock icon!",
@@ -1296,7 +1312,7 @@ function ui_draw()
 				"TIP: combos restore more energy!",
 				"TIP: matches must be diagonal!",
 			}
-			print(tips[math.floor(GAME_RANDOM * #tips) + 1], 6, 128, 4)
+			print(tips[math.floor(GAME.seed * #tips) + 1], 6, 128, 4)
 		end
 	else
 		-- map all colors to black to draw outlines
@@ -1335,17 +1351,17 @@ function ui_draw()
 end
 
 function bars_draw()
-	rect(ui_health.x + 3, ui_health.y, 1, grid_y + ui_health.zeroy - ui_health.y + 5, 8)
-	spr(50, ui_health.x, ui_health.y, 15, 1, 0, 0)
+	rect(UI.health.x + 3, UI.health.y, 1, GAME.GRID.y + UI.health.zeroy - UI.health.y + 5, 8)
+	spr(50, UI.health.x, UI.health.y, 15, 1, 0, 0)
 
-	rect(ui_combo.x + 3, ui_combo.y, 1, grid_y + ui_combo.zeroy - ui_combo.y + 5, 14)
-	spr(66, ui_combo.x, ui_combo.y, 15, 1, 0, 0)
+	rect(UI.combo.x + 3, UI.combo.y, 1, GAME.GRID.y + UI.combo.zeroy - UI.combo.y + 5, 14)
+	spr(66, UI.combo.x, UI.combo.y, 15, 1, 0, 0)
 
-	spr(51, ui_dir.x, ui_dir.y - 1, 15, 1, 0, 0)
+	spr(51, UI.dir.x, UI.dir.y - 1, 15, 1, 0, 0)
 end
 
 function ui_notify(str)
-	table.insert(notify_queue, {
+	table.insert(UI.notify_queue, {
 		words = str,
 		x = 240,
 		y = 3
@@ -1354,16 +1370,14 @@ end
 
 -- debug/util --------------------------------------------
 
-debug_list = {}
-
 function debug_reset()
-	debug_list = {}
+	DEBUG.items = {}
 	-- (" --- debug ---")
 end
 
 function debug_print()
 	local y = 0
-	for k, l in pairs(debug_list) do
+	for k, l in pairs(DEBUG.items) do
 		-- trace(l)
 		print(l, 0, y, 0)
 		print(l, 0, y + 2, 0)
@@ -1373,7 +1387,7 @@ function debug_print()
 end
 
 function dprint(thing)
-	table.insert(debug_list, thing)
+	table.insert(DEBUG.items, thing)
 end
 
 function lerp(a, b, t)
@@ -1381,13 +1395,13 @@ function lerp(a, b, t)
 end
 
 function sign(number)
-   if number > 0 then
-      return 1
-   elseif number < 0 then
-      return -1
-   else
-      return 0
-   end
+	if number > 0 then
+		return 1
+	elseif number < 0 then
+		return -1
+	else
+		return 0
+	end
 end
 
 function table.contains(table, element)
@@ -1420,13 +1434,6 @@ function table.shuffle(tbl)
 	return tbl
 end
 
--- init --------------------------------------------------
-
-function init()
-	game_title()
-end
-
-init()
 -- <TILES>
 -- 000:ff33fffff3663fff356663ff356663ff356663ff356663ff356663ff356663ff
 -- 001:ffffffffffffffffff333fffff3663fffff3563fffff3563fffff356ffffff35
@@ -2294,4 +2301,3 @@ init()
 -- <PALETTE>
 -- 000:006166009e8e7eeae623232e59718d73b5d8eee2d2663644b04643de7e527de39de65c32ffce5cbad93d4785ffe639e6
 -- </PALETTE>
-
