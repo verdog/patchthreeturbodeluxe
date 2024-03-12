@@ -6,6 +6,11 @@
 -- version: 0.0
 -- script:  lua
 
+-- LIST OF DELUXE IDEAS
+-- another resource type with the same rarity as the grow time one,
+--   that cuts all resources in a straight line (following the direction you match it)
+
+-- `GAME` is all of the game data. everything!
 GAME = {
 	time_of_day = 0, -- 0: morning, 1: noon, 2: evening
 	state = "title",
@@ -15,49 +20,59 @@ GAME = {
 	froots = 0,
 	seed = math.random(),
 
+	-- the trellis grid data
 	GRID = {
-		x = 20,
-		y = 19,
-		cols = 19,
-		rows = 6,
-		px_space = 8,
+		--[[
+		`cells` is the actual grid data. it contains veggies - see veg_make.
+		the first fruit is at index 0 for math reasons.
+		]] --
 		cells = {},
-		hover_i = nil,
-		held_i = nil,
+
+		x = 20,      -- x location of the upper left corner of the grid
+		y = 19,      -- y location of the upper left corner of the grid
+		cols = 19,   -- how many columns make up the grid
+		rows = 6,    -- how many rows make up the grid. each row is actually two visible rows
+		px_space = 8, -- pixel space between grid items
+		hover_i = nil, -- the index in `cells` of the currently hovered-over cell. nil if not hovering on grid.
+		held_i = nil, -- the index in `cells` of the selected (mouse down) cell. nil if not clicking.
 	},
 
-	PLOTS = {},
-	PARTICLES = {},
-	FREE_VEGS = {},
+	PLOTS = {},    -- "plots" are the data associated with collected resources. the bar graphs.
+	PARTICLES = {}, -- any active particles flying around
+	FREE_VEGS = {}, -- any active veggies, freed from their vines, flying around
 
+	-- game state for the grow phase
 	GROW = {
-		delay = 12,
-		survived = false,
+		delay = 12,     -- how many frames to wait between each little grow
+		survived = false, -- set to true if at least one grow happened in the grow phase
 	},
 
 	LILGUY = {
 		state = "wait",
 		x = 216,
 		y = 116,
-		vx = 0,
-		vy = 0,
+		vx = 0,  -- x velocity
+		vy = 0,  -- y velocity
 		onground = false,
-		target = nil,
-		blink = 0,
-		wait = 0,
+		blink = 0, -- how many frames left to do the blink animation
+		wait = 0, -- how many frames left to do the fruit claim animation
 	},
 }
 
+-- `UI` is the data associated with turning data from `GAME` into nice icons n stuff.
 UI = {
-	notify_queue = {},
-	health = {
-		zerox = 160,
+	notify_queue = {}, -- list of notification messages on the top of the screen
+
+	-- energy, combo, and clock are the little icons attached to the trellis. they all
+	-- have the same fields.
+	energy = {
+		zerox = 160,         -- x/y position the icon should be when energy is zero
 		zeroy = 96,
-		maxx = 160,
+		maxx = 160,          -- x/y position the icon should be when energy is max
 		maxy = -8,
-		x = GAME.GRID.x + 160,
-		y = GAME.GRID.y + 96,
-		dx = 0,
+		x = GAME.GRID.x + 160, -- current x/y position. these numbers only matter for frame 0.
+		y = GAME.GRID.y + 96, -- they are otherwise set every frame by the ui update fn.
+		dx = 0,              -- destination x/y position. every frame, move towards this point.
 		dy = 0,
 	},
 	combo = {
@@ -70,7 +85,7 @@ UI = {
 		dx = 0,
 		dy = 0,
 	},
-	dir = {
+	clock = {
 		zerox = -16,
 		zeroy = -16,
 		maxx = 162,
@@ -82,28 +97,29 @@ UI = {
 	},
 }
 
+-- random debug stuff
 DEBUG = {
+	-- list of things to print in the debug print fn
 	items = {},
 }
 
--- init --------------------------------------------------
+--[[ game ------------------------------------------------
+main startup/game loop functions
 
+functions that start with "game_enter" change GAME.state
+--]]
 function BOOT()
-	game_title()
+	game_enter_title()
 end
 
 function TIC()
 	debug_reset()
-	game()
-	draw()
+	game_update()
+	game_draw()
 	debug_print()
 end
 
-function game()
-	game_update()
-end
-
-function game_title()
+function game_enter_title()
 	GAME.state = "title"
 	GAME.LILGUY.state = "wait"
 	GAME.FREE_VEGS = {}
@@ -111,7 +127,25 @@ function game_title()
 	music(0)
 end
 
-function game_lose()
+function game_enter_play()
+	GAME.time_of_day = 0
+	grid_init()
+	plots_init()
+	GAME.LILGUY.state = "wait"
+	GAME.FREE_VEGS = {}
+	GAME.state = "play"
+	music(1)
+end
+
+function game_enter_grow()
+	sfx(4)
+	GAME.state = "grow"
+	GAME.GROW.delay = 60
+	GAME.GROW.survived = false
+	ui_notify("GROW TIME!!!")
+end
+
+function game_enter_lose()
 	GAME.state = "lose"
 end
 
@@ -139,22 +173,12 @@ function game_update()
 	end
 end
 
-function game_start()
-	GAME.time_of_day = 0
-	grid_init()
-	plots_init()
-	GAME.LILGUY.state = "wait"
-	GAME.FREE_VEGS = {}
-	GAME.state = "play"
-	music(1)
-end
-
-function draw()
+function game_draw()
 	if GAME.state ~= "title" then
 		bg_draw()
 		grid_draw()
 		plots_draw()
-		bars_draw()
+		ui_bars_draw()
 		particle_draw()
 		lilguy_draw()
 		free_vegs_draw()
@@ -172,7 +196,10 @@ function bg_draw(title)
 	map(0, 17, 30, 17, 0, 0, 15)
 	map(0, 34, 30, 17, 0, 0, 15)
 	if not title then
+		-- FIXME(josh): break this out into a neat and tidy function
 		map(0, 51, 30, 17, 0, 0, 15)
+
+		-- FIXME(josh): break this palette mapping stuff into its own function, it's used a lot
 		local PAL_MAP = 0x3FF0
 		poke4(PAL_MAP * 2 + 3, 4)
 		map(0, 68, 30, 17, 0, 0, 15)
@@ -540,7 +567,12 @@ function lilguy_draw()
 	end
 end
 
--- grid --------------------------------------------------
+--[[ grid ------------------------------------------------
+the grid logic. this is the most complicated part of the whole game! :-)
+this stuff handles dragging, dropping, and more :o
+FIXME(josh): write more about this weird stuff.
+]]
+--
 
 function grid_init()
 	for i = 0, (GAME.GRID.cols * GAME.GRID.rows) - 1 do
@@ -576,7 +608,7 @@ function grid_update_dragndrop(gx, gy, msl, msr)
 
 				if GAME.energy < 1 then
 					ui_notify("OUT OF MOVES!!! GAME OVER!!!")
-					game_lose()
+					game_enter_lose()
 				end
 			end
 		end
@@ -800,7 +832,7 @@ function grid_update(enable_mouse)
 	end
 
 	if advance_time[1] == true then
-		grow_enter()
+		game_enter_grow()
 	end
 
 	if any_dormant[1] == false then
@@ -1025,14 +1057,6 @@ function plots_draw()
 	end
 end
 
-function grow_enter()
-	sfx(4)
-	GAME.state = "grow"
-	GAME.GROW.delay = 60
-	GAME.GROW.survived = false
-	ui_notify("GROW TIME!!!")
-end
-
 function grow_update()
 	-- wait for combo to be over
 	if GAME.combo ~= 0 then return end
@@ -1233,33 +1257,33 @@ function ui_update()
 			end
 		end
 
-		UI.health.dx = GAME.GRID.x + lerp(UI.health.zerox, UI.health.maxx, (GAME.energy / 300))
-		UI.health.dy = GAME.GRID.y + lerp(UI.health.zeroy, UI.health.maxy, (GAME.energy / 300))
+		UI.energy.dx = GAME.GRID.x + lerp(UI.energy.zerox, UI.energy.maxx, (GAME.energy / 300))
+		UI.energy.dy = GAME.GRID.y + lerp(UI.energy.zeroy, UI.energy.maxy, (GAME.energy / 300))
 
 		UI.combo.dx = GAME.GRID.x + lerp(UI.combo.zerox, UI.combo.maxx, (GAME.combo / 150))
 		UI.combo.dy = GAME.GRID.y + lerp(UI.combo.zeroy, UI.combo.maxy, (GAME.combo / 150))
 
 		if GAME.time_of_day == 0 then
-			UI.dir.dx = GAME.GRID.x - 16
-			UI.dir.dy = GAME.GRID.y - 16
+			UI.clock.dx = GAME.GRID.x - 16
+			UI.clock.dy = GAME.GRID.y - 16
 		elseif GAME.time_of_day == 1 then
-			UI.dir.dx = GAME.GRID.x + 73
-			UI.dir.dy = GAME.GRID.y - 16
+			UI.clock.dx = GAME.GRID.x + 73
+			UI.clock.dy = GAME.GRID.y - 16
 		else
-			UI.dir.dx = GAME.GRID.x + 162
-			UI.dir.dy = GAME.GRID.y - 16
+			UI.clock.dx = GAME.GRID.x + 162
+			UI.clock.dy = GAME.GRID.y - 16
 		end
 
-		UI.health.x = UI.health.x + (UI.health.dx - UI.health.x) / 7
-		UI.health.y = UI.health.y + (UI.health.dy - UI.health.y) / 7
+		UI.energy.x = UI.energy.x + (UI.energy.dx - UI.energy.x) / 7
+		UI.energy.y = UI.energy.y + (UI.energy.dy - UI.energy.y) / 7
 		UI.combo.x = UI.combo.x + (UI.combo.dx - UI.combo.x) / 7
 		UI.combo.y = UI.combo.y + (UI.combo.dy - UI.combo.y) / 7
-		UI.dir.y = UI.dir.y + (UI.dir.dy - UI.dir.y) / 7
-		UI.dir.x = UI.dir.x + (UI.dir.dx - UI.dir.x) / 7
+		UI.clock.y = UI.clock.y + (UI.clock.dy - UI.clock.y) / 7
+		UI.clock.x = UI.clock.x + (UI.clock.dx - UI.clock.x) / 7
 	else
 		local _, _, msl, _, _ = mouse()
 		if msl == true then
-			game_start()
+			game_enter_play()
 		end
 
 		if math.random() < 0.003 then
@@ -1350,14 +1374,14 @@ function ui_draw()
 	end
 end
 
-function bars_draw()
-	rect(UI.health.x + 3, UI.health.y, 1, GAME.GRID.y + UI.health.zeroy - UI.health.y + 5, 8)
-	spr(50, UI.health.x, UI.health.y, 15, 1, 0, 0)
+function ui_bars_draw()
+	rect(UI.energy.x + 3, UI.energy.y, 1, GAME.GRID.y + UI.energy.zeroy - UI.energy.y + 5, 8)
+	spr(50, UI.energy.x, UI.energy.y, 15, 1, 0, 0)
 
 	rect(UI.combo.x + 3, UI.combo.y, 1, GAME.GRID.y + UI.combo.zeroy - UI.combo.y + 5, 14)
 	spr(66, UI.combo.x, UI.combo.y, 15, 1, 0, 0)
 
-	spr(51, UI.dir.x, UI.dir.y - 1, 15, 1, 0, 0)
+	spr(51, UI.clock.x, UI.clock.y - 1, 15, 1, 0, 0)
 end
 
 function ui_notify(str)
@@ -1372,13 +1396,11 @@ end
 
 function debug_reset()
 	DEBUG.items = {}
-	-- (" --- debug ---")
 end
 
 function debug_print()
 	local y = 0
 	for k, l in pairs(DEBUG.items) do
-		-- trace(l)
 		print(l, 0, y, 0)
 		print(l, 0, y + 2, 0)
 		print(l, 0, y + 1, 12)
@@ -1417,13 +1439,6 @@ function table.len(table)
 	local count = 0
 	for i, _ in table do count = count + 1 end
 	return count
-end
-
-function table.concat(t1, t2)
-	for i = 1, #t2 do
-		t1[#t1 + 1] = t2[i]
-	end
-	return t1
 end
 
 function table.shuffle(tbl)
@@ -2301,3 +2316,4 @@ end
 -- <PALETTE>
 -- 000:006166009e8e7eeae623232e59718d73b5d8eee2d2663644b04643de7e527de39de65c32ffce5cbad93d4785ffe639e6
 -- </PALETTE>
+
