@@ -200,10 +200,9 @@ function bg_draw(title)
 		map(0, 51, 30, 17, 0, 0, 15)
 
 		-- FIXME(josh): break this palette mapping stuff into its own function, it's used a lot
-		local PAL_MAP = 0x3FF0
-		poke4(PAL_MAP * 2 + 3, 4)
+		palette_map({3}, {4})
 		map(0, 68, 30, 17, 0, 0, 15)
-		poke4(PAL_MAP * 2 + 3, 3)
+		palette_reset()
 	end
 end
 
@@ -669,7 +668,7 @@ end
 function grid_update_pop_match(i, v)
 	-- if fruit, BIG MATCH
 	if v.color == 7 then
-		GAME.froots = GAME_FROOTS + 1
+		GAME.froots = GAME.froots + 1
 		ui_notify("FRUITS GET!!!")
 		free_vegs_spawn(v)
 	end
@@ -1343,9 +1342,7 @@ function ui_draw()
 		local PAL_MAP = 0x3FF0
 		local x = 104
 		local y = 18 + 8 * math.sin(time() / 2000)
-		for j = 0, 15 do
-			poke4(PAL_MAP * 2 + j, 3)
-		end
+		palette_map_all(3)
 
 		spr(76, x - 1, y - 1, 15, 1, 0, 0, 4, 3)
 		spr(76, x, y - 1, 15, 1, 0, 0, 4, 3)
@@ -1359,7 +1356,7 @@ function ui_draw()
 		spr(76, x, y + 1, 15, 1, 0, 0, 4, 3)
 		spr(76, x + 1, y + 1, 15, 1, 0, 0, 4, 3)
 
-		reset_palette()
+		palette_reset()
 
 		spr(76, x, y, 15, 1, 0, 0, 4, 3)
 
@@ -1424,13 +1421,23 @@ function sign(number)
 	end
 end
 
-function map_palette()
-
+function palette_map_all(to)
+	local PAL_MAP = 0x3FF0
+	for i=0,15 do
+		poke4(PAL_MAP * 2 + i, to)
+	end
 end
 
-function reset_palette()
+function palette_map(from, to)
 	local PAL_MAP = 0x3FF0
-	for j = 0, 15 do
+	for i=1,#from do
+		poke4(PAL_MAP * 2 + from[i], to[i])
+	end
+end
+
+function palette_reset()
+	local PAL_MAP = 0x3FF0
+	for j = 0,15 do
 		poke4(PAL_MAP * 2 + j, j)
 	end
 end
