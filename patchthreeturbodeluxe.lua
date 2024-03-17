@@ -199,10 +199,9 @@ function bg_draw(title)
 		-- FIXME(josh): break this out into a neat and tidy function
 		map(0, 51, 30, 17, 0, 0, 15)
 
-		-- FIXME(josh): break this palette mapping stuff into its own function, it's used a lot
 		palette_map({3}, {4})
 		map(0, 68, 30, 17, 0, 0, 15)
-		palette_reset()
+		palette_map_reset()
 	end
 end
 
@@ -536,8 +535,7 @@ function lilguy_draw()
 	local PAL_MAP = 0x3FF0
 
 	if GAME.LILGUY.blink > 0 then
-		poke4(PAL_MAP * 2 + 4, 3)
-		poke4(PAL_MAP * 2 + 6, 3)
+		palette_map({4, 6}, {3, 3})
 	end
 
 	if GAME.LILGUY.state == "claim" then
@@ -561,9 +559,7 @@ function lilguy_draw()
 		spr(sp, math.floor(GAME.LILGUY.x - 4 + 0.5), GAME.LILGUY.y, 15, 1, flip, 0, 2, 2)
 	end
 
-	for j = 0, 15 do
-		poke4(PAL_MAP * 2 + j, j)
-	end
+	palette_map_reset()
 end
 
 --[[ grid ------------------------------------------------
@@ -853,25 +849,13 @@ end
 function grid_draw()
 	for i, v in pairs(GAME.GRID.cells) do
 		if v.color >= 1 and v.color <= 5 and v.dormant > 0 then
-			-- map all colors to black to draw outlines
-			local PAL_MAP = 0x3FF0
-			for j = 0, 15 do
-				poke4(PAL_MAP * 2 + j, 1)
-			end
 			veg_draw(i, v, 0, 0)
-			for j = 0, 15 do
-				poke4(PAL_MAP * 2 + j, j)
-			end
 		elseif v.color > 5 then
 			if v.age < 24 then
 				local PAL_MAP = 0x3FF0
-				for j = 0, 15 do
-					poke4(PAL_MAP * 2 + j, 6)
-				end
+				palette_map_all(6)
 				veg_draw(i, v, 0, 0)
-				for j = 0, 15 do
-					poke4(PAL_MAP * 2 + j, j)
-				end
+				palette_map_reset()
 			else
 				veg_draw(i, v, 0, 0)
 			end
@@ -1356,7 +1340,7 @@ function ui_draw()
 		spr(76, x, y + 1, 15, 1, 0, 0, 4, 3)
 		spr(76, x + 1, y + 1, 15, 1, 0, 0, 4, 3)
 
-		palette_reset()
+		palette_map_reset()
 
 		spr(76, x, y, 15, 1, 0, 0, 4, 3)
 
@@ -1435,7 +1419,7 @@ function palette_map(from, to)
 	end
 end
 
-function palette_reset()
+function palette_map_reset()
 	local PAL_MAP = 0x3FF0
 	for j = 0,15 do
 		poke4(PAL_MAP * 2 + j, j)
