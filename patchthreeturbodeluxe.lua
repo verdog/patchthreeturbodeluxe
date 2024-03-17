@@ -1359,9 +1359,7 @@ function ui_draw()
 		spr(76, x, y + 1, 15, 1, 0, 0, 4, 3)
 		spr(76, x + 1, y + 1, 15, 1, 0, 0, 4, 3)
 
-		for j = 0, 15 do
-			poke4(PAL_MAP * 2 + j, j)
-		end
+		reset_palette()
 
 		spr(76, x, y, 15, 1, 0, 0, 4, 3)
 
@@ -1426,6 +1424,17 @@ function sign(number)
 	end
 end
 
+function map_palette()
+
+end
+
+function reset_palette()
+	local PAL_MAP = 0x3FF0
+	for j = 0, 15 do
+		poke4(PAL_MAP * 2 + j, j)
+	end
+end
+
 function table.contains(table, element)
 	for _, value in pairs(table) do
 		if value == element then
@@ -1433,6 +1442,13 @@ function table.contains(table, element)
 		end
 	end
 	return false
+end
+
+function table.concat(t1, t2)
+	for i=1,#t2 do
+		t1[#t1+1] = t2[i]
+	end
+	return t1
 end
 
 function table.len(table)
