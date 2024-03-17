@@ -3,12 +3,24 @@
 -- desc:    battle of the bits game jam five
 -- site:    battleofthebits.com
 -- license: MIT License
--- version: 0.0
+-- version: 1.0
 -- script:  lua
 
 -- LIST OF DELUXE IDEAS
+--
 -- another resource type with the same rarity as the grow time one,
 --   that cuts all resources in a straight line (following the direction you match it)
+-- little guys coming out of cabins - one guy per match three (?)
+--   and more guys coming in and building cabins
+-- redo grow mechanic - every set of 3/4 makes bud, 1/2 grows vine, moving fruit/buds
+--   with it. bud becomes fruit on second grow time. automatic vine growth?
+-- make the game a little more predictable - maybe make edges dormant so you can plan
+-- figure out a more sane way to map fruit list to screen
+-- MAXIMUM PEPPER
+-- rare fruit - maybe the slice powerup is a fruit?
+-- modes - endless? with and end? linear?
+-- redo fruit matches - same fruit only, gradually introduce more fruits
+-- only two time of day: morning and evening
 
 -- `GAME` is all of the game data. everything!
 GAME = {
@@ -196,9 +208,10 @@ function bg_draw(title)
 	map(0, 17, 30, 17, 0, 0, 15)
 	map(0, 34, 30, 17, 0, 0, 15)
 	if not title then
-		-- FIXME(josh): break this out into a neat and tidy function
 		map(0, 51, 30, 17, 0, 0, 15)
 
+		-- this palette map is to turn the grey outlines of the trellis into
+		-- light grey to reduce visual noise
 		palette_map({3}, {4})
 		map(0, 68, 30, 17, 0, 0, 15)
 		palette_map_reset()
@@ -532,7 +545,6 @@ end
 
 function lilguy_draw()
 	local flip = 0
-	local PAL_MAP = 0x3FF0
 
 	if GAME.LILGUY.blink > 0 then
 		palette_map({4, 6}, {3, 3})
@@ -852,7 +864,6 @@ function grid_draw()
 			veg_draw(i, v, 0, 0)
 		elseif v.color > 5 then
 			if v.age < 24 then
-				local PAL_MAP = 0x3FF0
 				palette_map_all(6)
 				veg_draw(i, v, 0, 0)
 				palette_map_reset()
@@ -1323,7 +1334,6 @@ function ui_draw()
 		end
 	else
 		-- map all colors to black to draw outlines
-		local PAL_MAP = 0x3FF0
 		local x = 104
 		local y = 18 + 8 * math.sin(time() / 2000)
 		palette_map_all(3)
